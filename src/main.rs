@@ -20,7 +20,7 @@ impl Default for SimulationState {
         Self {
             paused: false,
             focus_target: None,
-            camera_zoom: 100.0,
+            camera_zoom: 500.0,
             camera_offset: Vec2::ZERO,
         }
     }
@@ -41,14 +41,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (
-                gravity_physics,
-                update_positions,
-                handle_input,
-                camera_follow,
-                draw_trails,
-            )
-                .chain(),
+            (gravity_physics, update, inputs, follow, trail).chain(),
         )
         .run();
 }
@@ -57,13 +50,12 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    mut sim_state: ResMut<SimulationState>,
+    _sim_state: ResMut<SimulationState>,
 ) {
     commands.spawn(Camera2d);
 
     spawn_solar_system(&mut commands, &mut meshes, &mut materials);
 }
-
 
 fn gravity_physics(
     mut query: Query<(Entity, &mut Velocity, &Transform, &CelestialBody)>,
@@ -103,7 +95,7 @@ fn gravity_physics(
     }
 }
 
-fn update_positions(mut query: Query<(&mut Transform, &Velocity)>) {
+fn update(mut query: Query<(&mut Transform, &Velocity)>) {
     for (mut transform, velocity) in &mut query {
         let movement = velocity.0 * TIME_STEP;
         transform.translation.x += movement.x;
@@ -111,8 +103,8 @@ fn update_positions(mut query: Query<(&mut Transform, &Velocity)>) {
     }
 }
 
-fn handle_input(
-    mut commands: Commands,
+fn inputs(
+    _commands: Commands,
     mouse_input: Res<ButtonInput<MouseButton>>,
     mut mouse_motion: EventReader<MouseMotion>,
     mut mouse_wheel: EventReader<MouseWheel>,
@@ -138,7 +130,6 @@ fn handle_input(
     if mouse_input.just_pressed(MouseButton::Left) {
         if let Some(cursor_position) = window.cursor_position() {
             if let Ok(world_pos) = cam.viewport_to_world_2d(cam_transform, cursor_position) {
-
                 let mut clicked_body = None;
 
                 for (entity, transform, body) in &bodies {
@@ -164,7 +155,7 @@ fn handle_input(
     }
 }
 
-fn camera_follow(
+fn follow(
     mut camera_query: Query<&mut Transform, With<Camera>>,
     target_query: Query<&Transform, (With<CelestialBody>, Without<Camera>)>,
     sim_state: Res<SimulationState>,
@@ -185,22 +176,12 @@ fn camera_follow(
     cam_transform.translation.y = target_pos.y + sim_state.camera_offset.y;
 }
 
-#[derive(Component)]
-struct Trail {
-    points: Vec<Vec2>,
-    timer: Timer,
-}
-
-fn draw_trails(
+fn trail(
     mut gizmos: Gizmos,
     query: Query<(&Transform, &CelestialBody)>,
-    sim_state: Res<SimulationState>,
+    _sim_state: Res<SimulationState>,
 ) {
     for (transform, body) in &query {
-        gizmos.circle_2d(
-            transform.translation.truncate(),
-            body.radius,
-            body.color,
-        );
+        gizmos.circle_2d(transform.translation.truncate(), body.radius, body.color);
     }
 }

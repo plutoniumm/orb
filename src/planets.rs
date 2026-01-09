@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Component, Debug, Clone)]
 pub struct CelestialBody {
@@ -11,71 +13,66 @@ pub struct CelestialBody {
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Velocity(pub Vec2);
 
-const G: f32 = 4.0 * std::f32::consts::PI * std::f32::consts::PI; // G in AU^3 / (yr^2 * SolarMass) roughly
-const SOL_MASS: f32 = 1.0;
-const EARTH_MASS: f32 = 3.003e-6; // Solar masses
+const SOL: f32 = 1.0;
+const EARTH: f32 = 3.003e-6; // Solar masses
 
-pub fn spawn_solar_system(commands: &mut Commands, meshes: &mut ResMut<Assets<Mesh>>, materials: &mut ResMut<Assets<ColorMaterial>>) {
+const PLANETS: &str = include_str!("../data/planets.json");
+
+#[derive(Debug, Deserialize)]
+struct PlanetsFile {
+    planets: HashMap<String, PlanetState>,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy)]
+struct PlanetState {
+    pos: [f32; 2],
+    vel: [f32; 2],
+}
+
+fn load_planet_states() -> HashMap<String, PlanetState> {
+    let parsed: PlanetsFile = serde_json::from_str(PLANETS).expect("Failed to parse planets.json");
+
+    parsed.planets
+}
+
+fn vec2_from_arr(a: [f32; 2]) -> Vec2 {
+    Vec2::new(a[0], a[1])
+}
+
+const DAYS_PER_YEAR: f32 = 365.25;
+
+pub fn spawn_solar_system(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<ColorMaterial>>,
+) {
+    let planet_states = load_planet_states();
+
+    // name, mass, radius, color
     let bodies = vec![
-        (
-            "Sun",
-            SOL_MASS,
-            0.5, // Visual radius
-            Color::srgb(1.0, 0.9, 0.0),
-            Vec2::ZERO,
-            Vec2::ZERO,
-        ),
-        (
-            "Mercury",
-            0.166 * EARTH_MASS,
-            0.1,
-            Color::srgb(0.7, 0.7, 0.7),
-            Vec2::new(0.39, 0.0),
-            Vec2::new(0.0, 1.59), // Velocity roughly sqrt(1/r) scaled
-        ),
-        (
-            "Venus",
-            0.815 * EARTH_MASS,
-            0.2,
-            Color::srgb(0.9, 0.8, 0.6),
-            Vec2::new(0.72, 0.0),
-            Vec2::new(0.0, 1.18),
-        ),
-        (
-            "Earth",
-            EARTH_MASS,
-            0.2,
-            Color::srgb(0.2, 0.4, 1.0),
-            Vec2::new(1.0, 0.0),
-            Vec2::new(0.0, 1.0), // 1 AU/yr approx
-        ),
-        (
-            "Mars",
-            0.107 * EARTH_MASS,
-            0.15,
-            Color::srgb(0.8, 0.3, 0.2),
-            Vec2::new(1.52, 0.0),
-            Vec2::new(0.0, 0.808),
-        ),
-        (
-            "Jupiter",
-            317.8 * EARTH_MASS,
-            0.4,
-            Color::srgb(0.8, 0.6, 0.4),
-            Vec2::new(5.20, 0.0),
-            Vec2::new(0.0, 0.439),
-        ),
-        (
-            "Saturn",
-            95.2 * EARTH_MASS,
-            0.35,
-            Color::srgb(0.9, 0.8, 0.5),
-            Vec2::new(9.58, 0.0),
-            Vec2::new(0.0, 0.325),
-        ),
+        ("sun", SOL, 0.5, Color::srgb(1.0, 0.9, 0.0)),
+        ("mercury", 0.166 * EARTH, 0.1, Color::srgb(0.7, 0.7, 0.7)),
+        ("venus", 0.815 * EARTH, 0.2, Color::srgb(0.9, 0.8, 0.6)),
+        ("earth", EARTH, 0.2, Color::srgb(0.2, 0.4, 1.0)),
+        ("mars", 0.107 * EARTH, 0.15, Color::srgb(0.8, 0.3, 0.2)),
+        ("jupiter", 317.8 * EARTH, 0.4, Color::srgb(0.8, 0.6, 0.4)),
+        ("saturn", 95.2 * EARTH, 0.35, Color::srgb(0.9, 0.8, 0.5)),
+        ("uranus", 14.536 * EARTH, 0.3, Color::srgb(0.6, 0.8, 0.9)),
+        ("neptune", 17.147 * EARTH, 0.3, Color::srgb(0.3, 0.5, 0.9)),
     ];
 
-    for (name, mass, radius, color, pos, vel) in bodies {
+    for (name, mass, radius, color) in bodies {
+        let (pos, vel) = if name == "sun" {
+            (Vec2::ZERO, Vec2::ZERO)
+        } else {
+            let state = planet_states
+                .get(name)
+                .unwrap_or_else(|| panic!("Missing planet '{name}' in data/planets.json"));
+            let pos = vec2_from_arr(state.pos);
+            let vel = vec2_from_arr(state.vel) * DAYS_PER_YEAR;
+            (pos, vel)
+        };
+
         commands.spawn((
             CelestialBody {
                 name: name.to_string(),
