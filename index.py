@@ -2,6 +2,9 @@ from urllib.request import urlretrieve
 from jplephem.spk import SPK
 import json, os
 
+if not os.path.exists("./data"):
+    os.makedirs("./data")
+
 EPHEMERIS_URL = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp"
 EPHEMERIS_FILE = "./data/de440.bsp"
 OUTPUT_FILE = "./data/planets.json"

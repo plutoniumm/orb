@@ -116,8 +116,7 @@ fn inputs(
     let (cam, cam_transform) = *camera;
 
     for event in mouse_wheel.read() {
-        sim_state.camera_zoom += event.y * 2.0;
-        sim_state.camera_zoom = sim_state.camera_zoom.clamp(5.0, 500.0);
+        sim_state.camera_zoom *= (1.0 - event.y * 0.1).clamp(0.9, 1.1);
     }
 
     if mouse_input.pressed(MouseButton::Right) {

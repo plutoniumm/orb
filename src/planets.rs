@@ -14,7 +14,7 @@ pub struct CelestialBody {
 pub struct Velocity(pub Vec2);
 
 const SOL: f32 = 1.0;
-const EARTH: f32 = 3.003e-6; // Solar masses
+const M_E: f32 = 3.003e-6; // Solar masses
 
 const PLANETS: &str = include_str!("../data/planets.json");
 
@@ -29,7 +29,7 @@ struct PlanetState {
     vel: [f32; 2],
 }
 
-fn load_planet_states() -> HashMap<String, PlanetState> {
+fn load_planets() -> HashMap<String, PlanetState> {
     let parsed: PlanetsFile = serde_json::from_str(PLANETS).expect("Failed to parse planets.json");
 
     parsed.planets
@@ -46,19 +46,19 @@ pub fn spawn_solar_system(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<ColorMaterial>>,
 ) {
-    let planet_states = load_planet_states();
+    let planet_states = load_planets();
 
     // name, mass, radius, color
     let bodies = vec![
         ("sun", SOL, 0.5, Color::srgb(1.0, 0.9, 0.0)),
-        ("mercury", 0.166 * EARTH, 0.1, Color::srgb(0.7, 0.7, 0.7)),
-        ("venus", 0.815 * EARTH, 0.2, Color::srgb(0.9, 0.8, 0.6)),
-        ("earth", EARTH, 0.2, Color::srgb(0.2, 0.4, 1.0)),
-        ("mars", 0.107 * EARTH, 0.15, Color::srgb(0.8, 0.3, 0.2)),
-        ("jupiter", 317.8 * EARTH, 0.4, Color::srgb(0.8, 0.6, 0.4)),
-        ("saturn", 95.2 * EARTH, 0.35, Color::srgb(0.9, 0.8, 0.5)),
-        ("uranus", 14.536 * EARTH, 0.3, Color::srgb(0.6, 0.8, 0.9)),
-        ("neptune", 17.147 * EARTH, 0.3, Color::srgb(0.3, 0.5, 0.9)),
+        ("mercury", 0.166 * M_E, 0.1, Color::srgb(0.7, 0.7, 0.7)),
+        ("venus", 0.815 * M_E, 0.2, Color::srgb(0.9, 0.8, 0.6)),
+        ("earth", M_E, 0.2, Color::srgb(0.2, 0.4, 1.0)),
+        ("mars", 0.107 * M_E, 0.15, Color::srgb(0.8, 0.3, 0.2)),
+        ("jupiter", 317.8 * M_E, 0.4, Color::srgb(0.8, 0.6, 0.4)),
+        ("saturn", 95.2 * M_E, 0.35, Color::srgb(0.9, 0.8, 0.5)),
+        ("uranus", 14.536 * M_E, 0.3, Color::srgb(0.6, 0.8, 0.9)),
+        ("neptune", 17.147 * M_E, 0.3, Color::srgb(0.3, 0.5, 0.9)),
     ];
 
     for (name, mass, radius, color) in bodies {
@@ -68,6 +68,7 @@ pub fn spawn_solar_system(
             let state = planet_states
                 .get(name)
                 .unwrap_or_else(|| panic!("Missing planet '{name}' in data/planets.json"));
+
             let pos = vec2_from_arr(state.pos);
             let vel = vec2_from_arr(state.vel) * DAYS_PER_YEAR;
             (pos, vel)
