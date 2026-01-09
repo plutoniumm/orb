@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component)]
 pub struct CelestialBody {
     pub name: String,
     pub mass: f32,
@@ -14,7 +14,7 @@ pub struct CelestialBody {
 pub struct Velocity(pub Vec2);
 
 const SOL: f32 = 1.0;
-const M_E: f32 = 3.003e-6; // Solar masses
+const M_E: f32 = 3.003e-6;
 
 const PLANETS: &str = include_str!("../data/planets.json");
 
@@ -39,7 +39,7 @@ fn vec2_from_arr(a: [f32; 2]) -> Vec2 {
     Vec2::new(a[0], a[1])
 }
 
-const DAYS_PER_YEAR: f32 = 365.25;
+const DAYS_PER_YEAR: f32 = 365.2422;
 
 pub fn spawn_solar_system(
     commands: &mut Commands,
@@ -50,15 +50,15 @@ pub fn spawn_solar_system(
 
     // name, mass, radius, color
     let bodies = vec![
-        ("sun", SOL, 0.5, Color::srgb(1.0, 0.9, 0.0)),
-        ("mercury", 0.166 * M_E, 0.1, Color::srgb(0.7, 0.7, 0.7)),
-        ("venus", 0.815 * M_E, 0.2, Color::srgb(0.9, 0.8, 0.6)),
-        ("earth", M_E, 0.2, Color::srgb(0.2, 0.4, 1.0)),
-        ("mars", 0.107 * M_E, 0.15, Color::srgb(0.8, 0.3, 0.2)),
-        ("jupiter", 317.8 * M_E, 0.4, Color::srgb(0.8, 0.6, 0.4)),
-        ("saturn", 95.2 * M_E, 0.35, Color::srgb(0.9, 0.8, 0.5)),
-        ("uranus", 14.536 * M_E, 0.3, Color::srgb(0.6, 0.8, 0.9)),
-        ("neptune", 17.147 * M_E, 0.3, Color::srgb(0.3, 0.5, 0.9)),
+        ("sun", SOL, 0.1, Color::srgb(1.0, 0.9, 0.0)),
+        ("mercury", 0.166 * M_E, 0.03, Color::srgb(0.7, 0.7, 0.7)),
+        ("venus", 0.815 * M_E, 0.05, Color::srgb(0.9, 0.8, 0.6)),
+        ("earth", M_E, 0.05, Color::srgb(0.2, 0.4, 1.0)),
+        ("mars", 0.107 * M_E, 0.05, Color::srgb(0.8, 0.3, 0.2)),
+        ("jupiter", 317.8 * M_E, 0.1, Color::srgb(0.8, 0.6, 0.4)),
+        ("saturn", 95.2 * M_E, 0.1, Color::srgb(0.9, 0.8, 0.5)),
+        ("uranus", 14.536 * M_E, 0.1, Color::srgb(0.6, 0.8, 0.9)),
+        ("neptune", 17.147 * M_E, 0.1, Color::srgb(0.3, 0.5, 0.9)),
     ];
 
     for (name, mass, radius, color) in bodies {

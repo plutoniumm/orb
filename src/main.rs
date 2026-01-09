@@ -9,8 +9,8 @@ const TIME_STEP: f32 = 0.01;
 
 #[derive(Resource)]
 struct SimulationState {
-    paused: bool,
     focus_target: Option<Entity>,
+    focus_name: String,
     camera_zoom: f32,
     camera_offset: Vec2,
 }
@@ -18,13 +18,16 @@ struct SimulationState {
 impl Default for SimulationState {
     fn default() -> Self {
         Self {
-            paused: false,
             focus_target: None,
-            camera_zoom: 500.0,
+            focus_name: "None".to_string(),
+            camera_zoom: 3000.0,
             camera_offset: Vec2::ZERO,
         }
     }
 }
+
+#[derive(Component)]
+struct HudText;
 
 fn main() {
     App::new()
@@ -41,7 +44,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (gravity_physics, update, inputs, follow, trail).chain(),
+            (gravity_physics, update, inputs, follow, trail, make_HUD).chain(),
         )
         .run();
 }
@@ -53,6 +56,29 @@ fn setup(
     _sim_state: ResMut<SimulationState>,
 ) {
     commands.spawn(Camera2d);
+
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(12.0),
+                bottom: Val::Px(12.0),
+                padding: UiRect::all(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Selected: None\nZoom: 0"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                HudText,
+            ));
+        });
 
     spawn_solar_system(&mut commands, &mut meshes, &mut materials);
 }
@@ -129,25 +155,31 @@ fn inputs(
     if mouse_input.just_pressed(MouseButton::Left) {
         if let Some(cursor_position) = window.cursor_position() {
             if let Ok(world_pos) = cam.viewport_to_world_2d(cam_transform, cursor_position) {
-                let mut clicked_body = None;
+                let mut clicked_body: Option<(Entity, String)> = None;
 
                 for (entity, transform, body) in &bodies {
                     let planet_pos = transform.translation.truncate();
                     let dist = world_pos.distance(planet_pos);
 
                     if dist < (body.radius * 2.0).max(0.5) {
-                        clicked_body = Some(entity);
+                        let name = if !body.name.is_empty() {
+                            body.name.clone()
+                        } else {
+                            format!("{:?}", entity)
+                        };
+                        clicked_body = Some((entity, name));
                         break;
                     }
                 }
 
-                if let Some(e) = clicked_body {
+                if let Some((e, name)) = clicked_body {
                     sim_state.focus_target = Some(e);
+                    sim_state.focus_name = name;
                     sim_state.camera_offset = Vec2::ZERO;
                     println!("Focused on planet: {:?}", e);
                 } else {
-                    // Clicking empty space could clear focus, or do nothing.
-                    // sim_state.focus_target = None;
+                    sim_state.focus_target = None;
+                    sim_state.focus_name = "Sun".to_string();
                 }
             }
         }
@@ -183,4 +215,16 @@ fn trail(
     for (transform, body) in &query {
         gizmos.circle_2d(transform.translation.truncate(), body.radius, body.color);
     }
+}
+
+fn make_HUD(sim_state: Res<SimulationState>, mut query: Query<&mut Text, With<HudText>>) {
+    if !sim_state.is_changed() {
+        return;
+    }
+
+    let mut text = query.single_mut();
+    *text = Text::new(format!(
+        "Selected: {}\nZoom: {:.0}",
+        sim_state.focus_name, sim_state.camera_zoom
+    ));
 }
