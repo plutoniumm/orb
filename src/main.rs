@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use planets::{spawn_solar_system, CelestialBody, Velocity};
 
 const G_CONST: f32 = 1.0;
-const TIME_STEP: f32 = 0.01;
+const TIME_STEP: f32 = 0.005;
 
 #[derive(Resource)]
 struct SimulationState {
@@ -13,6 +13,7 @@ struct SimulationState {
     focus_name: String,
     camera_zoom: f32,
     camera_offset: Vec2,
+    sim_speed: f32,
 }
 
 impl Default for SimulationState {
@@ -22,12 +23,16 @@ impl Default for SimulationState {
             focus_name: "None".to_string(),
             camera_zoom: 3000.0,
             camera_offset: Vec2::ZERO,
+            sim_speed: 1.0,
         }
     }
 }
 
 #[derive(Component)]
 struct HudText;
+
+#[derive(Component)]
+struct ControlsText;
 
 fn main() {
     App::new()
@@ -44,7 +49,16 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (gravity_physics, update, inputs, follow, trail, make_HUD).chain(),
+            (
+                gravity_physics,
+                update,
+                inputs,
+                follow,
+                trail,
+                make_hud,
+                make_controls,
+            )
+                .chain(),
         )
         .run();
 }
@@ -57,6 +71,7 @@ fn setup(
 ) {
     commands.spawn(Camera2d);
 
+    // HUD
     commands
         .spawn((
             Node {
@@ -64,9 +79,12 @@ fn setup(
                 left: Val::Px(12.0),
                 bottom: Val::Px(12.0),
                 padding: UiRect::all(Val::Px(8.0)),
+                border: UiRect::all(Val::Px(1.5)),
                 ..default()
             },
+            BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.25)),
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+            BorderRadius::all(Val::Px(10.0)),
         ))
         .with_children(|parent| {
             parent.spawn((
@@ -80,13 +98,40 @@ fn setup(
             ));
         });
 
+    // CONTROLS
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(12.0),
+                bottom: Val::Px(12.0),
+                padding: UiRect::all(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Controls\nUp/Down: Zoom\nLeft/Right: Speed"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(1.0, 1.0, 1.0, 0.5)),
+                ControlsText,
+            ));
+        });
+
     spawn_solar_system(&mut commands, &mut meshes, &mut materials);
 }
 
 fn gravity_physics(
     mut query: Query<(Entity, &mut Velocity, &Transform, &CelestialBody)>,
     all_bodies: Query<(Entity, &Transform, &CelestialBody)>,
+    sim_state: Res<SimulationState>,
 ) {
+    let dt = TIME_STEP * sim_state.sim_speed;
+
     let mut accelerations = Vec::new();
 
     for (e1, _, t1, _) in &query {
@@ -116,14 +161,16 @@ fn gravity_physics(
 
     for (entity, acc) in accelerations {
         if let Ok((_, mut vel, _, _)) = query.get_mut(entity) {
-            vel.0 += acc * TIME_STEP;
+            vel.0 += acc * dt;
         }
     }
 }
 
-fn update(mut query: Query<(&mut Transform, &Velocity)>) {
+fn update(mut query: Query<(&mut Transform, &Velocity)>, sim_state: Res<SimulationState>) {
+    let dt = TIME_STEP * sim_state.sim_speed;
+
     for (mut transform, velocity) in &mut query {
-        let movement = velocity.0 * TIME_STEP;
+        let movement = velocity.0 * dt;
         transform.translation.x += movement.x;
         transform.translation.y += movement.y;
     }
@@ -132,6 +179,7 @@ fn update(mut query: Query<(&mut Transform, &Velocity)>) {
 fn inputs(
     _commands: Commands,
     mouse_input: Res<ButtonInput<MouseButton>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     mut mouse_motion: EventReader<MouseMotion>,
     mut mouse_wheel: EventReader<MouseWheel>,
     window: Single<&Window>,
@@ -143,6 +191,20 @@ fn inputs(
 
     for event in mouse_wheel.read() {
         sim_state.camera_zoom *= (1.0 - event.y * 0.1).clamp(0.9, 1.1);
+    }
+
+    if keyboard_input.just_pressed(KeyCode::ArrowUp) {
+        sim_state.camera_zoom *= 1.1;
+    }
+    if keyboard_input.just_pressed(KeyCode::ArrowDown) {
+        sim_state.camera_zoom *= 0.9;
+    }
+
+    if keyboard_input.just_pressed(KeyCode::ArrowRight) {
+        sim_state.sim_speed = (sim_state.sim_speed * 1.1).clamp(0.0, 100.0);
+    }
+    if keyboard_input.just_pressed(KeyCode::ArrowLeft) {
+        sim_state.sim_speed = (sim_state.sim_speed * 0.9).clamp(0.0, 100.0);
     }
 
     if mouse_input.pressed(MouseButton::Right) {
@@ -217,14 +279,23 @@ fn trail(
     }
 }
 
-fn make_HUD(sim_state: Res<SimulationState>, mut query: Query<&mut Text, With<HudText>>) {
+fn make_hud(sim_state: Res<SimulationState>, mut query: Query<&mut Text, With<HudText>>) {
     if !sim_state.is_changed() {
         return;
     }
 
     let mut text = query.single_mut();
     *text = Text::new(format!(
-        "Selected: {}\nZoom: {:.0}",
-        sim_state.focus_name, sim_state.camera_zoom
+        "Selected: {}\nZoom: {:.0}\nSpeed: {:.2}x",
+        sim_state.focus_name, sim_state.camera_zoom, sim_state.sim_speed
     ));
+}
+
+fn make_controls(sim_state: Res<SimulationState>, mut query: Query<&mut Text, With<ControlsText>>) {
+    if !sim_state.is_changed() {
+        return;
+    }
+
+    let mut text = query.single_mut();
+    *text = Text::new(format!("Arrow Controls\nUp/Down: Zoom\nLeft/Right: Speed"));
 }

@@ -1,4 +1,8 @@
-### orb
+<a href="https://en.wikipedia.org/wiki/Orb:_On_the_Movements_of_the_Earth">
+<img src="./src/orb.svg" alt="orb" width="120" height="120" align="right"/>
+</a>
+
+### Orb
 
 There is no center of the solar system. You can use any planet as the center, or any point in space for that matter. The rules of gravity will still apply the same way.
 
