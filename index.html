@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Orb</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="icon" type="image/svg+xml" href="./build/orb.svg">
+  <link rel="apple-touch-icon" href="./build/orb.svg">
+
+  <meta name="title" content="Orb">
+  <meta name="description"
+    content="A simple orbital simulation using Bevy and WebAssembly to show that physics does not change with what is taken as the centre of the solar system">
+  <meta name="robots" content="index, follow">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="author" content="plutoniumm">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Orb">
+  <meta property="og:description"
+    content="A simple orbital simulation using Bevy and WebAssembly to show that physics does not change with what is taken as the centre of the solar system">
+
+
+  <style>
+    canvas,
+    canvas:focus {
+      outline: none;
+    }
+
+    body {
+      background: #000;
+      height: 100vh;
+      width: 100vw;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+    }
+  </style>
+  <link rel="stylesheet" href="https://manav.ch/atomic.css">
+</head>
+
+<body class="f j-ct al-ct p-rel">
+  <div id="warning">
+    Orb takes a while to load... please be patient. You may have to reload once or twice.
+  </div>
+</body>
+
+<script type="module">
+  import init from './build/orb.js';
+
+  init()
+    .catch( ( error ) => {
+      if ( !error.message.includes( "This isn't actually an error!" ) ) {
+        throw error;
+      }
+    } )
+    .then( () => document.querySelector( '#warning' ).remove() );
+</script>
+
+</html>
