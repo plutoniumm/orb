@@ -15,7 +15,7 @@ deploy:
 	mv ./build dist/;
 	touch package.json;
 	npx gh-pages -d dist;
-	rm package.json;
+	rm -rf package.json node_modules;
 
 init:
 	python3 index.py;
