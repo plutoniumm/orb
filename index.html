@@ -29,21 +29,127 @@
     }
 
     body {
-      background: #000;
-      height: 100vh;
-      width: 100vw;
-      color: #fff;
       font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #000;
+      color: #fff;
+    }
+
+    svg {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    .scene {
+      position: relative;
+      width: 1000px;
+      height: 1000px;
+    }
+
+    .center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .orbit {
+      width: 640px;
+      height: 640px;
+      border-radius: 50%;
+      border: 2px solid #2b2b2b;
+    }
+
+    .trail {
+      width: 640px;
+      height: 640px;
+      border-radius: 50%;
+    }
+
+    .sun {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      box-shadow: 0 0 24px 8px rgba(77, 195, 255, 0.7);
+      background: radial-gradient(circle at 50% 50%, #fffb99 0%, #ffd34d 60%, #4dc3ff 100%);
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform: translate(-50%, -50%);
     }
   </style>
   <link rel="stylesheet" href="https://manav.ch/atomic.css">
 </head>
 
-<body class="f j-ct al-ct p-rel">
-  <div id="warning">
-    Orb takes a while to load... please be patient. You may have to reload once or twice.
+<body class="f j-ct al-ct p-rel" style="height: 100vh;width: 100vw;">
+  <div class="h-100 w-100" id="warning">
+    <div class="scene center">
+      <div id="trail" class="trail center"></div>
+      <div class="orbit center"></div>
+      <div id="sun" class="sun"></div>
+    </div>
   </div>
 </body>
+
+<script>
+  const cx = 500, cy = 500;
+  const r = 320;
+
+  function percent ( p ) {
+    const t = Math.max( 0, Math.min( 100, p ) ) / 100;
+    const angle = t * Math.PI * 2 - Math.PI / 2; // start at top
+    const x = cx + r * Math.cos( angle );
+    const y = cy + r * Math.sin( angle );
+
+    sun.style.left = `${ x }px`;
+    sun.style.top = `${ y }px`;
+
+    const deg = t * 360;
+    trail.style.background = `conic-gradient(#fff8 ${ deg }deg, transparent 0deg)`;
+  }
+
+  function patch ( name ) {
+    return fetch( name ).then( response => {
+      if ( !response.ok || !response.body ) {
+        throw Error( `Failed to fetch ${ name }` );
+      }
+
+      const contentLength = response.headers.get( 'Content-Length' );
+      if ( !contentLength ) {
+        console.warn( 'Content-Length response header unavailable' );
+        return response;
+      }
+
+      const total = parseInt( contentLength, 10 );
+      let loaded = 0;
+
+      const reader = response.body.getReader();
+      const stream = new ReadableStream( {
+        start ( controller ) {
+          function read () {
+            reader.read().then( ( { done, value } ) => {
+              if ( done ) {
+                controller.close();
+                return;
+              }
+              loaded += value.byteLength;
+              percent( ( loaded / total ) * 100 );
+              controller.enqueue( value );
+              read();
+            } ).catch( error => {
+              console.error( 'Error while reading:', error );
+              controller.error( error );
+            } );
+          };
+
+          read();
+        }
+      } );
+
+      return new Response( stream, { headers: response.headers } );
+    } );
+  }
+</script>
 
 <script type="module">
   import init from './build/orb.js';
@@ -54,7 +160,7 @@
         throw error;
       }
     } )
-    .then( () => document.querySelector( '#warning' ).remove() );
+    .then( () => document.getElementById( 'warning' ).remove() );
 </script>
 
 </html>
