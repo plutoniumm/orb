@@ -1,6 +1,6 @@
 {
   "name": "orb",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Newtonian solar-system simulation that shows the solar system has no center.",
   "type": "module",
   "scripts": {

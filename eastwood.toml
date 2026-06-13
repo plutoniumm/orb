@@ -1,0 +1,31 @@
+[linter]
+fail_on = "warning"
+
+[typescript]
+enable = [
+  "js/await-in-loop",          # await inside a loop; consider Promise.all()
+  "js/blank-around-blocks",    # multi-line loop/conditional without blank lines around it
+  "js/blank-around-functions", # function or class without blank lines around it
+  "js/blank-before-return",    # return statement without a blank line before it
+  "js/boolean-layout",         # multi-condition boolean or nested ternary not split across lines
+  "js/break-per-line",         # break/continue sharing a line with other code
+  "js/console",                # console.log/warn/error left in code
+  "js/control-flow",           # control flow inline with other code, or if/else without braces
+  "js/debugger",               # debugger statement left in code
+  "js/decl-per-line",          # multiple declarations in one statement must be one per line
+  "js/no-alert",               # alert/confirm/prompt left in code
+  "js/no-eval",                # eval() call is a security risk
+  "js/no-new-wrapper",         # new Boolean/Number/String wrapper object
+  "js/no-throw-literal",       # throwing a non-Error value
+  "js/no-var",                 # var declaration; use let or const
+  "js/object-layout",          # objects with 3+ keys one key per line; 1-2 keys may stay on one line
+  "js/template-no-expression", # template literal without any ${...} expression
+  "js/todo-comment",           # TODO/FIXME/HACK comment left in code
+  "js/trailing-comma",         # multiline object literal without trailing comma
+  "js/triple-equality",        # == or != instead of === / !==
+  "ts/blank-around-types",     # interface/enum without blank lines around it
+  "ts/no-explicit-any",        # explicit 'any' type annotation
+  "ts/no-namespace",           # TypeScript namespace/module declaration
+  "ts/non-null-assertion",     # ! non-null assertion bypasses type safety
+]
+disable = []

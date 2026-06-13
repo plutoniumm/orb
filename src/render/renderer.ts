@@ -1,11 +1,23 @@
 import type { Camera, SimState } from '../types';
 
-const TRAIL_LEN = 2000; // trail samples per body
+const TRAIL_LEN = 2000;
+const FADE_SAMPLES = 1200; // trail fades to nothing across the most recent samples
+const TRAIL_BASE_ALPHA = 0.55;
+const TRAIL_BAND = 6; // samples per alpha step (perf vs. fade smoothness)
+
+const CONTROL_LINES = [
+  'Click a body — make it the center',
+  'Drag — pan    Wheel / ↑↓ — zoom',
+  '← → — speed    Space — pause',
+];
+
+/** Reference frame being displayed; during a switch it blends two bodies. */
+export type RefView = { fromRef: number; toRef: number; blend: number };
 
 /**
- * Draws bodies and trails to the OffscreenCanvas. Trails are plotted in the
- * current reference frame as `body(t) - reference(t)`, so the Sun gives clean
- * ellipses and the Earth gives Ptolemaic epicycles.
+ * Trails are plotted in the current reference frame as `body(t) - reference(t)`
+ * (Sun → ellipses, Earth → epicycles). During a switch the reference is the
+ * blend `lerp(fromRef, toRef, blend)`, so the scene morphs with no snap.
  */
 export class Renderer {
   private ctx: OffscreenCanvasRenderingContext2D;
@@ -18,32 +30,39 @@ export class Renderer {
   private h = 0;
   private dpr = 1;
 
+  // Blended reference position written by computeRef (avoids per-sample allocation).
+  private refX = 0;
+  private refY = 0;
+
   constructor(ctx: OffscreenCanvasRenderingContext2D, n: number) {
     this.ctx = ctx;
     this.n = n;
     this.hist = new Float32Array(TRAIL_LEN * n * 2);
   }
 
-  resize(w: number, h: number, dpr: number): void {
+  resize (w: number, h: number, dpr: number): void {
     this.w = w;
     this.h = h;
     this.dpr = dpr;
   }
 
-  record(pos: Float64Array): void {
+  record (pos: Float64Array): void {
     const base = this.head * this.n * 2;
-    for (let k = 0; k < this.n * 2; k++) this.hist[base + k] = pos[k];
+    const len = this.n * 2;
+    for (let k = 0; k < len; k++) this.hist[base + k] = pos[k];
     this.head = (this.head + 1) % TRAIL_LEN;
     if (this.count < TRAIL_LEN) this.count++;
   }
 
-  pick(x: number, y: number, state: SimState, cam: Camera): number | null {
+  pick (x: number, y: number, state: SimState, cam: Camera, view: RefView): number | null {
     const { w, h, n } = this;
     const cx = w / 2 + cam.panX;
     const cy = h / 2 + cam.panY;
-    const refX = state.pos[2 * cam.reference];
-    const refY = state.pos[2 * cam.reference + 1];
+    this.computeRef(state.pos, view, 0);
+    const refX = this.refX;
+    const refY = this.refY;
     // Reverse so the visually top-most body wins overlaps.
+
     for (let b = n - 1; b >= 0; b--) {
       const sx = cx + (state.pos[2 * b] - refX) * cam.zoom;
       const sy = cy - (state.pos[2 * b + 1] - refY) * cam.zoom;
@@ -52,22 +71,23 @@ export class Renderer {
       const dy = y - sy;
       if (dx * dx + dy * dy <= r * r) return b;
     }
+
     return null;
   }
 
-  render(state: SimState, cam: Camera, speed: number): void {
+  render (state: SimState, cam: Camera, speed: number, view: RefView): void {
     const { ctx, w, h, dpr, n } = this;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#05060a';
     ctx.fillRect(0, 0, w, h);
 
-    const R = cam.reference;
     const cx = w / 2 + cam.panX;
     const cy = h / 2 + cam.panY;
-    const refX = state.pos[2 * R];
-    const refY = state.pos[2 * R + 1];
+    this.computeRef(state.pos, view, 0);
+    const refX = this.refX;
+    const refY = this.refY;
 
-    this.drawTrails(state, cam, cx, cy);
+    this.drawTrails(state, cam, view, cx, cy);
 
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = 1;
@@ -100,7 +120,7 @@ export class Renderer {
       ctx.arc(sx, sy, r, 0, Math.PI * 2);
       ctx.fill();
 
-      if (b === R) {
+      if (b === view.toRef) {
         ctx.strokeStyle = 'rgba(255,255,255,0.7)';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -116,37 +136,61 @@ export class Renderer {
     this.drawHud(state, cam, speed);
   }
 
-  private drawTrails(state: SimState, cam: Camera, cx: number, cy: number): void {
-    const { ctx, n, count, head } = this;
-    if (count < 2) return;
-    const R = cam.reference;
-    const start = (head - count + TRAIL_LEN) % TRAIL_LEN;
-
-    ctx.lineWidth = 1;
-    for (let b = 0; b < n; b++) {
-      if (b === R) continue; // reference sits at the origin
-      ctx.beginPath();
-      for (let s = 0; s < count; s++) {
-        const slot = (start + s) % TRAIL_LEN;
-        const o = slot * n * 2;
-        const rx = this.hist[o + R * 2];
-        const ry = this.hist[o + R * 2 + 1];
-        const px = cx + (this.hist[o + b * 2] - rx) * cam.zoom;
-        const py = cy - (this.hist[o + b * 2 + 1] - ry) * cam.zoom;
-        if (s === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.strokeStyle = withAlpha(state.defs[b].color, 0.5);
-      ctx.stroke();
-    }
+  /** Writes the blended reference position at state offset `o` into refX/refY. */
+  private computeRef (buf: Float64Array | Float32Array, view: RefView, o: number): void {
+    const { fromRef, toRef, blend } = view;
+    const fx = buf[o + fromRef * 2];
+    const fy = buf[o + fromRef * 2 + 1];
+    this.refX = fx + (buf[o + toRef * 2] - fx) * blend;
+    this.refY = fy + (buf[o + toRef * 2 + 1] - fy) * blend;
   }
 
-  private screenRadius(state: SimState, b: number, cam: Camera): number {
+  private drawTrails (state: SimState, cam: Camera, view: RefView, cx: number, cy: number): void {
+    const { ctx, n, count, head, hist } = this;
+    if (count < 2) return;
+    const settled = view.blend >= 1;
+    const window = Math.min(count, FADE_SAMPLES);
+    const oldest = (head - window + TRAIL_LEN) % TRAIL_LEN;
+    const zoom = cam.zoom;
+
+    ctx.lineWidth = 1;
+
+    for (let b = 0; b < n; b++) {
+      if (settled && b === view.toRef) continue; // sits at the origin
+      ctx.strokeStyle = state.defs[b].color;
+
+      for (let s = 0; s < window - 1; s += TRAIL_BAND) {
+        const end = Math.min(window - 1, s + TRAIL_BAND);
+        ctx.globalAlpha = (end / (window - 1)) * TRAIL_BASE_ALPHA;
+        ctx.beginPath();
+
+        for (let k = s; k <= end; k++) {
+          const o = ((oldest + k) % TRAIL_LEN) * n * 2;
+          this.computeRef(hist, view, o);
+          const x = cx + (hist[o + b * 2] - this.refX) * zoom;
+          const y = cy - (hist[o + b * 2 + 1] - this.refY) * zoom;
+
+          if (k === s) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+
+        ctx.stroke();
+      }
+    }
+
+    ctx.globalAlpha = 1;
+  }
+
+  private screenRadius (state: SimState, b: number, cam: Camera): number {
     const floor = b === 0 ? 9 : 3;
+
     return Math.max(state.defs[b].radius * cam.zoom, floor);
   }
 
-  private drawHud(state: SimState, cam: Camera, speed: number): void {
+  private drawHud (state: SimState, cam: Camera, speed: number): void {
     const { ctx } = this;
     ctx.font = '13px system-ui, sans-serif';
 
@@ -160,18 +204,9 @@ export class Renderer {
     );
 
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    const lines = [
-      'Click a body — make it the center',
-      'Drag — pan    Wheel / ↑↓ — zoom',
-      '← → — speed    Space — pause',
-    ];
-    lines.forEach((t, i) => ctx.fillText(t, 14, this.h - 14 - (lines.length - 1 - i) * 17));
-  }
-}
 
-function withAlpha(hex: string, a: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${a})`;
+    for (let i = 0; i < CONTROL_LINES.length; i++) {
+      ctx.fillText(CONTROL_LINES[i], 14, this.h - 14 - (CONTROL_LINES.length - 1 - i) * 17);
+    }
+  }
 }

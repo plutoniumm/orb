@@ -6,14 +6,16 @@ export const TIME_STEP = 0.005;
 
 const SOFTENING2 = 1e-8; // avoids singular force on coincident bodies
 
-export function accelerations(state: SimState, out: Float64Array): void {
+export function accelerations (state: SimState, out: Float64Array): void {
   const { pos, defs, n } = state;
   out.fill(0);
+
   for (let i = 0; i < n; i++) {
     const xi = pos[2 * i];
     const yi = pos[2 * i + 1];
     let ax = 0;
     let ay = 0;
+
     for (let j = 0; j < n; j++) {
       if (i === j) continue;
       const dx = pos[2 * j] - xi;
@@ -25,6 +27,7 @@ export function accelerations(state: SimState, out: Float64Array): void {
       ax += dx * inv * f;
       ay += dy * inv * f;
     }
+
     out[2 * i] = ax;
     out[2 * i + 1] = ay;
   }
@@ -33,7 +36,7 @@ export function accelerations(state: SimState, out: Float64Array): void {
 // Velocity-Verlet. `aCur` must hold the acceleration at the current positions on
 // entry; it is updated in place to the acceleration at the new positions, so the
 // caller reuses it next step (one force eval per step).
-export function step(
+export function step (
   state: SimState,
   dt: number,
   aCur: Float64Array,
