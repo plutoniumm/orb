@@ -1,28 +1,17 @@
-run:
-	cargo fmt;
-	cargo run --release;
+# Thin wrappers around the npm scripts (see package.json).
 
-build:
-	cargo fmt;
-	cargo build --release --target wasm32-unknown-unknown;
-	wasm-bindgen --no-typescript --target web --out-dir ./build/ --out-name "orb" ./target/wasm32-unknown-unknown/release/orb.wasm;
-	cp ./src/orb.svg ./build/orb.svg;
-	sed -i '' 's/fetch(module_or_path);/patch(module_or_path);/g' ./build/orb.js;
-
-prep:
-	rm -rf dist;
-	mkdir -p dist;
-	cp index.html dist/index.html;
-	mv ./build dist/;
-
-deploy:
-	rm -rf dist;
-	mkdir -p dist;
-	cp index.html dist/index.html;
-	mv ./build dist/;
-	touch package.json;
-	npx gh-pages -d dist;
-	rm -rf package.json node_modules;
-
+# regenerate data/planets.json from the JPL DE440 ephemeris (needs python3)
 init:
-	python3 index.py;
+	python3 index.py
+
+# local dev server with hot reload
+dev:
+	npm run dev
+
+# production build into ./dist
+build:
+	npm run build
+
+# build and publish ./dist to GitHub Pages
+deploy:
+	npm run deploy

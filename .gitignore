@@ -1,8 +1,9 @@
-/target
+node_modules/
+dist/
 .vscode
 local/
 .DS_Store
-Cargo.lock
 data/*.bsp
-build/
-dist/
+
+package-lock.json
+pnpm-lock.yaml

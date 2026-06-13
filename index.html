@@ -3,168 +3,61 @@
 
 <head>
   <meta charset="utf-8">
-  <title>Orb</title>
+  <title>Orb — the solar system has no center</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <link rel="icon" type="image/svg+xml" href="./build/orb.svg">
-  <link rel="apple-touch-icon" href="./build/orb.svg">
+  <link rel="icon" type="image/svg+xml" href="./orb.svg">
+  <link rel="apple-touch-icon" href="./orb.svg">
 
-  <meta name="title" content="Orb">
-  <meta name="description"
-    content="A simple orbital simulation using Bevy and WebAssembly to show that physics does not change with what is taken as the centre of the solar system">
-  <meta name="robots" content="index, follow">
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <meta name="author" content="plutoniumm">
+  <meta name="description"
+    content="A Newtonian solar-system simulation showing that physics doesn't change with what you treat as the center. Pick any planet as the origin — the result is the same.">
+  <meta name="robots" content="index, follow">
 
   <meta property="og:type" content="website">
   <meta property="og:title" content="Orb">
   <meta property="og:description"
-    content="A simple orbital simulation using Bevy and WebAssembly to show that physics does not change with what is taken as the centre of the solar system">
-
+    content="A Newtonian solar-system simulation showing the solar system has no center.">
 
   <!-- analytics on plutoniumm.github.io -->
-  <script defer src='https://static.cloudflareinsights.com/beacon.min.js'
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js"
     data-cf-beacon='{"token": "6dd90a981e8b47dd9725e27e28491525"}'></script>
 
   <style>
-    canvas,
-    canvas:focus {
-      outline: none;
-    }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background: #000;
-      color: #fff;
-    }
-
-    svg {
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #05060a; }
+    #view {
+      display: block;
       width: 100vw;
       height: 100vh;
-      display: block;
+      touch-action: none;
+      cursor: crosshair;
     }
-
-    .scene {
-      position: relative;
-      width: 1000px;
-      height: 1000px;
+    #view:focus { outline: none; }
+    #loader {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #05060a;
+      transition: opacity .5s ease;
     }
-
-    .center {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .orbit {
-      width: 640px;
-      height: 640px;
+    #loader.hide { opacity: 0; pointer-events: none; }
+    .ring {
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
-      border: 2px solid #2b2b2b;
+      border: 2px solid #1b2030;
+      border-top-color: #4dc3ff;
+      animation: spin 1s linear infinite;
     }
-
-    .trail {
-      width: 640px;
-      height: 640px;
-      border-radius: 50%;
-    }
-
-    .sun {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      box-shadow: 0 0 24px 8px rgba(77, 195, 255, 0.7);
-      background: radial-gradient(circle at 50% 50%, #fffb99 0%, #ffd34d 60%, #4dc3ff 100%);
-      position: absolute;
-      left: 0;
-      top: 0;
-      transform: translate(-50%, -50%);
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
-  <link rel="stylesheet" href="https://manav.ch/atomic.css">
 </head>
 
-<body class="f j-ct al-ct p-rel" style="height: 100vh;width: 100vw;">
-  <div class="h-100 w-100" id="warning">
-    <div class="scene center">
-      <div id="trail" class="trail center"></div>
-      <div class="orbit center"></div>
-      <div id="sun" class="sun"></div>
-    </div>
-  </div>
+<body>
+  <canvas id="view"></canvas>
+  <div id="loader"><div class="ring"></div></div>
+  <script type="module" src="/src/main.ts"></script>
 </body>
-
-<script>
-  const cx = 500, cy = 500;
-  const r = 320;
-
-  function percent ( p ) {
-    const t = Math.max( 0, Math.min( 100, p ) ) / 100;
-    const angle = t * Math.PI * 2 - Math.PI / 2; // start at top
-    const x = cx + r * Math.cos( angle );
-    const y = cy + r * Math.sin( angle );
-
-    sun.style.left = `${ x }px`;
-    sun.style.top = `${ y }px`;
-
-    const deg = t * 360;
-    trail.style.background = `conic-gradient(#fff8 ${ deg }deg, transparent 0deg)`;
-  }
-
-  function patch ( name ) {
-    return fetch( name ).then( response => {
-      if ( !response.ok || !response.body ) {
-        throw Error( `Failed to fetch ${ name }` );
-      }
-
-      const contentLength = response.headers.get( 'Content-Length' );
-      if ( !contentLength ) {
-        console.warn( 'Content-Length response header unavailable' );
-        return response;
-      }
-
-      const total = parseInt( contentLength, 10 );
-      let loaded = 0;
-
-      const reader = response.body.getReader();
-      const stream = new ReadableStream( {
-        start ( controller ) {
-          function read () {
-            reader.read().then( ( { done, value } ) => {
-              if ( done ) {
-                controller.close();
-                return;
-              }
-              loaded += value.byteLength;
-              percent( ( loaded / total ) * 100 );
-              controller.enqueue( value );
-              read();
-            } ).catch( error => {
-              console.error( 'Error while reading:', error );
-              controller.error( error );
-            } );
-          };
-
-          read();
-        }
-      } );
-
-      return new Response( stream, { headers: response.headers } );
-    } );
-  }
-</script>
-
-<script type="module">
-  import init from './build/orb.js';
-
-  init()
-    .catch( ( error ) => {
-      if ( !error.message.includes( "This isn't actually an error!" ) ) {
-        throw error;
-      }
-    } )
-    .then( () => document.getElementById( 'warning' ).remove() );
-</script>
 
 </html>
